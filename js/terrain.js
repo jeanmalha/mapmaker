@@ -3,6 +3,13 @@
  *
  * The heightmap is a Float32Array of size W*H, values 0–1.
  * (0 = deepest ocean, 1 = highest peak)
+ *
+ * Exports:
+ *   TERRAIN        — ordered map of height thresholds → terrain metadata
+ *   TERRAIN_HEIGHT — canonical height value for each paintable terrain id
+ *   heightToColor()       — map a height value to an RGB triple
+ *   heightToTerrainId()   — map a height value to a terrain id string
+ *   Terrain               — class that owns and generates the heightmap
  */
 
 // Height thresholds → terrain type (ordered low → high)
@@ -31,6 +38,11 @@ export const TERRAIN_HEIGHT = {
   peaks:         0.92,
 };
 
+/**
+ * Map a normalised height value (0–1) to an RGB colour triple.
+ * @param {number} h - Height value in [0, 1]
+ * @returns {number[]} [r, g, b] each in [0, 1]
+ */
 export function heightToColor(h) {
   for (const t of Object.values(TERRAIN)) {
     if (h <= t.max) return t.color;
@@ -38,6 +50,11 @@ export function heightToColor(h) {
   return TERRAIN.PEAKS.color;
 }
 
+/**
+ * Map a normalised height value (0–1) to a terrain id string.
+ * @param {number} h - Height value in [0, 1]
+ * @returns {string} Terrain id (e.g. 'ocean', 'plains', 'peaks')
+ */
 export function heightToTerrainId(h) {
   for (const t of Object.values(TERRAIN)) {
     if (h <= t.max) return t.id;
@@ -45,13 +62,73 @@ export function heightToTerrainId(h) {
   return 'peaks';
 }
 
+/**
+ * Owns the planet heightmap and all operations that modify it.
+ *
+ * The heightmap is a row-major Float32Array of `size × size` values in [0, 1].
+ * Index formula: `heightmap[y * size + x]`
+ * All brush methods wrap horizontally (x) so painting near the east edge
+ * seamlessly continues on the west side.
+ */
 export class Terrain {
+  /**
+   * @param {number} [size=512] - Heightmap edge length in pixels (square)
+   */
   constructor(size = 512) {
     this.size = size;
     this.heightmap = new Float32Array(size * size);
   }
 
-  /** Generate using multi-octave simplex noise */
+  /** Change resolution and reset heightmap (caller must regenerate) */
+  setSize(size) {
+    this.size      = size;
+    this.heightmap = new Float32Array(size * size);
+  }
+
+  /**
+   * Upscale (or downscale) the existing heightmap to newSize using bilinear
+   * interpolation — terrain detail is preserved, no data is discarded.
+   */
+  resizeTo(newSize) {
+    const oldSize = this.size;
+    const oldHm   = this.heightmap;
+    const newHm   = new Float32Array(newSize * newSize);
+    const scale   = (oldSize - 1) / (newSize - 1);
+
+    for (let ny = 0; ny < newSize; ny++) {
+      for (let nx = 0; nx < newSize; nx++) {
+        const ox = nx * scale;
+        const oy = ny * scale;
+        const x0 = Math.floor(ox);
+        const y0 = Math.floor(oy);
+        const x1 = Math.min(x0 + 1, oldSize - 1);
+        const y1 = Math.min(y0 + 1, oldSize - 1);
+        const fx = ox - x0;
+        const fy = oy - y0;
+
+        newHm[ny * newSize + nx] =
+          oldHm[y0 * oldSize + x0] * (1 - fx) * (1 - fy) +
+          oldHm[y0 * oldSize + x1] * fx        * (1 - fy) +
+          oldHm[y1 * oldSize + x0] * (1 - fx) * fy        +
+          oldHm[y1 * oldSize + x1] * fx        * fy;
+      }
+    }
+
+    this.size      = newSize;
+    this.heightmap = newHm;
+  }
+
+  /**
+   * Generate a new heightmap using multi-octave 3D simplex noise projected
+   * onto a sphere so the map tiles seamlessly in the equirectangular projection.
+   *
+   * @param {object} [settings={}]
+   * @param {number} [settings.seaLevel=0.42]        - Fraction of the map that becomes ocean (0–1)
+   * @param {number} [settings.continentSize=0.50]   - Noise frequency scale; higher = larger features
+   * @param {number} [settings.mountainHeight=0.60]  - Vertical exaggeration of land above sea level
+   * @param {number} [settings.roughness=0.40]       - Fractal persistence; higher = more detail noise
+   * @param {number} [settings.landShape=0.50]       - 0 = scattered islands, 1 = large continents
+   */
   generate(settings = {}) {
     const {
       seaLevel       = 0.42,
@@ -120,7 +197,17 @@ export class Terrain {
     }
   }
 
-  /** Paint a circle on the heightmap */
+  /**
+   * Paint a circular region of the heightmap toward a target height.
+   * Each pixel blends linearly from its current value toward `targetHeight`,
+   * with a radial falloff so the brush edge is soft.
+   *
+   * @param {number} cx           - Centre X in heightmap pixels
+   * @param {number} cy           - Centre Y in heightmap pixels
+   * @param {number} radius       - Brush radius in pixels
+   * @param {number} targetHeight - Desired height in [0, 1] at the brush centre
+   * @param {number} strength     - Blend factor per stroke in [0, 1]; 1 = instant snap
+   */
   paint(cx, cy, radius, targetHeight, strength) {
     const S = this.size;
     const r2 = radius * radius;
@@ -137,7 +224,16 @@ export class Terrain {
     }
   }
 
-  /** Raise or lower terrain */
+  /**
+   * Raise or lower terrain by adding a fixed delta each stroke.
+   * Use a positive `delta` to raise (raise tool) or negative to lower.
+   *
+   * @param {number} cx       - Centre X in heightmap pixels
+   * @param {number} cy       - Centre Y in heightmap pixels
+   * @param {number} radius   - Brush radius in pixels
+   * @param {number} delta    - Height change per stroke (e.g. +0.01 or -0.01)
+   * @param {number} strength - Radial weight multiplier in [0, 1]
+   */
   sculpt(cx, cy, radius, delta, strength) {
     const S = this.size;
     const r2 = radius * radius;
@@ -153,7 +249,15 @@ export class Terrain {
     }
   }
 
-  /** Smooth (box blur) around a point */
+  /**
+   * Smooth terrain by blending each pixel toward the average of its 3×3 neighbourhood.
+   * Applied within a circular brush region with radial falloff.
+   *
+   * @param {number} cx       - Centre X in heightmap pixels
+   * @param {number} cy       - Centre Y in heightmap pixels
+   * @param {number} radius   - Brush radius in pixels
+   * @param {number} strength - Smoothing weight per stroke in [0, 1]
+   */
   smooth(cx, cy, radius, strength) {
     const S = this.size;
     const r2 = radius * radius;
@@ -177,6 +281,27 @@ export class Terrain {
         const i   = py * S + px;
         const t   = strength * (1 - Math.sqrt(dx*dx + dy*dy) / radius);
         this.heightmap[i] += (avg - this.heightmap[i]) * t;
+      }
+    }
+  }
+
+  /**
+   * Rotate the heightmap so that the given longitude becomes the new prime meridian (0°).
+   * Each row is cyclically shifted; no data is lost.
+   *
+   * @param {number} degrees - Longitude to move to 0° (positive = shift east)
+   */
+  shiftLon(degrees) {
+    const S     = this.size;
+    const shift = (Math.round((degrees / 360) * S) % S + S) % S;
+    if (shift === 0) return;
+    const hm  = this.heightmap;
+    const tmp = new Float32Array(S);
+    for (let y = 0; y < S; y++) {
+      const row = y * S;
+      tmp.set(hm.subarray(row, row + S));
+      for (let x = 0; x < S; x++) {
+        hm[row + x] = tmp[(x + shift) % S];
       }
     }
   }

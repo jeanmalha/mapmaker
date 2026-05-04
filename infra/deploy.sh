@@ -78,12 +78,13 @@ echo "  CF Domain:    https://$CF_DOMAIN"
 #
 # Caching strategy:
 #   - JS/CSS: max-age=1year + immutable (aggressive browser + CDN caching)
-#   - index.html: no-cache (always fresh)
+#   - index.html: max-age=3600 (1 hour); CloudFront invalidation on every
+#     deploy ensures CDN always serves fresh HTML immediately after release.
 #
 # Cache-busting: a Unix timestamp is injected as ?v=<ts> into every
 # ES module import statement in every JS file, and into the <script>/<link>
-# tags in index.html. Since all URLs change on each deploy, browsers treat
-# them as new resources and fetch fresh — then cache for a year.
+# tags in index.html. Since all asset URLs change on each deploy, browsers
+# treat them as new resources and fetch fresh — then cache for a year.
 #
 DEPLOY_VERSION=$(date +%s)
 TMPDIR=$(mktemp -d /tmp/mapmaker-deploy.XXXXXX)
@@ -124,10 +125,10 @@ aws s3 cp "$TMPDIR/style.css" "s3://$BUCKET/style.css" \
   --cache-control "public, max-age=31536000, immutable" \
   --content-type "text/css"
 
-# index.html — no-cache (always revalidate)
+# index.html — short cache; CloudFront invalidation keeps CDN fresh on deploy
 aws s3 cp "$TMPDIR/index.html" "s3://$BUCKET/index.html" \
   --profile "$PROFILE" \
-  --cache-control "no-cache, no-store, must-revalidate" \
+  --cache-control "public, max-age=3600" \
   --content-type "text/html"
 
 rm -rf "$TMPDIR"

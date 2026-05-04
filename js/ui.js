@@ -113,6 +113,11 @@ export class UI {
 
   // ── Generate ──────────────────────────────────────
   _bindGenerateControls() {
+    // Resolution selector — just records the target; buttons act on it
+    document.getElementById('gen-resolution').addEventListener('change', e => {
+      this.state.targetResolution = parseInt(e.target.value, 10);
+    });
+
     this._slider('gen-sea-level',  v => { this.state.planet.settings.seaLevel       = v / 100; });
     this._slider('gen-land-shape', v => { this.state.planet.settings.landShape      = v / 100; });
     this._slider('gen-continent',  v => { this.state.planet.settings.continentSize  = v / 100; });
@@ -120,14 +125,28 @@ export class UI {
     this._slider('gen-roughness',  v => { this.state.planet.settings.roughness      = v / 100; });
 
     document.getElementById('btn-generate').addEventListener('click', () => {
-      if (!confirm('Generate a new planet? This will replace all current terrain.')) return;
+      if (!confirm('Generate a new planet? This will replace all current terrain and markers.')) return;
+      const size = this.state.targetResolution ?? this.terrain.size;
+      this.terrain.setSize(size);
+      this.markers.fromJSON([]);
+      this.mapView.resizeBuffer();
       this.terrain.generate(this.state.planet.settings);
       this.planet.updateGeometry(this.terrain.heightmap);
-      // Re-render flat map buffer if it's visible
-      if (this._currentView === 'flat') {
-        this.mapView.renderBuffer();
-        this.mapView.render();
-      }
+      this.mapView.renderBuffer();
+      this.mapView.render();
+      this._refreshMarkerList();
+    });
+
+    document.getElementById('btn-upscale').addEventListener('click', () => {
+      const size = this.state.targetResolution ?? this.terrain.size;
+      if (size === this.terrain.size) return;
+      const verb = size > this.terrain.size ? 'Upscale' : 'Downscale';
+      if (!confirm(`${verb} terrain from ${this.terrain.size}×${this.terrain.size} to ${size}×${size}? Markers will be kept.`)) return;
+      this.terrain.resizeTo(size);
+      this.mapView.resizeBuffer();
+      this.planet.updateGeometry(this.terrain.heightmap);
+      this.mapView.renderBuffer();
+      this.mapView.render();
     });
 
     document.getElementById('btn-flip-ew').addEventListener('click', () => {
@@ -218,9 +237,15 @@ export class UI {
   // ── Marker click — globe ──────────────────────────
   _bindMarkerClick() {
     this.planet.canvas.addEventListener('click', e => {
-      if (this.state.tool !== 'marker') return;
       const hit = this.planet.raycast(e.clientX, e.clientY);
       if (!hit) return;
+
+      if (this.state.tool === 'setlon') {
+        this._applyShiftLon(hit.lon);
+        return;
+      }
+
+      if (this.state.tool !== 'marker') return;
       this._pendingMarkerHit = hit;
       document.getElementById('marker-name-input').value = '';
       document.getElementById('marker-desc-input').value = '';
@@ -228,10 +253,19 @@ export class UI {
     });
   }
 
+  _applyShiftLon(lon) {
+    this.terrain.shiftLon(lon);
+    this.markers.shiftLon(lon);
+    this.planet.updateGeometry(this.terrain.heightmap);
+    this.mapView.renderBuffer();
+    this.mapView.render();
+    this._refreshMarkerList();
+  }
+
   // ── Painting in 2D flat view ──────────────────────
   _bindMapViewPainting() {
     this.mapView.onPaint = (e) => {
-      if (this.state.tool === 'orbit' || this.state.tool === 'marker') return;
+      if (this.state.tool === 'orbit' || this.state.tool === 'marker' || this.state.tool === 'setlon') return;
 
       const { px, py } = this.mapView.canvasToHeightmap(e.clientX, e.clientY);
       const radius   = Math.max(1, Math.floor(this.state.brushSize));
@@ -261,6 +295,15 @@ export class UI {
     // On mouse-up in flat view, sync 3D geometry
     document.getElementById('map-canvas').addEventListener('mouseup', () => {
       this.planet.updateGeometry(this.terrain.heightmap);
+    });
+
+    // Set prime meridian in flat view
+    document.getElementById('map-canvas').addEventListener('click', e => {
+      if (this.state.tool === 'setlon') {
+        const { lon } = this.mapView.canvasToLatLon(e.clientX, e.clientY);
+        this._applyShiftLon(lon);
+        return;
+      }
     });
 
     // Marker placement in flat view

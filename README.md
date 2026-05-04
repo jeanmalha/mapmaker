@@ -15,8 +15,11 @@ Live at **[planetbuilder.malha.land](https://planetbuilder.malha.land)**
 - Nine terrain types: Deep Ocean, Coast, Beach, Desert (Yellow), Desert (White), Plains, Hills, Mountains, Peaks
 - Real-time painting tools: brush by terrain type, raise/lower height, smooth
 - Flat map view (equirectangular projection) with pan and zoom
+- Globe and flat map share the same coordinate system — a marker placed on either view appears correctly on both
 
 ### Generation Controls
+- **Resolution** — 256×256 (Draft) · 512×512 (Standard) · 1024×1024 (High) · 2048×2048 (Ultra)
+- **Upscale** — bilinearly interpolate the existing heightmap to the selected resolution; markers are preserved
 - **Sea Level** — how much of the planet is covered by water
 - **Islands ↔ Continents** — controls tectonic plate simulation (island chains vs. large landmasses)
 - **Continent Size** — noise scale for landmass feature size
@@ -29,10 +32,16 @@ Live at **[planetbuilder.malha.land](https://planetbuilder.malha.land)**
 - Toggleable latitude/longitude graticule and N/S pole markers
 - Marker pins with labels on both 3D globe and flat map
 
+### Map Tools
+- **Marker** — click to place a named location; appears on both globe and flat map
+- **Set Prime Meridian (0°)** — click any point to rotate the entire world so that location becomes longitude 0°; terrain and markers shift together
+- **Flip E↔W** — mirror the whole map east-to-west; useful to correct orientation after generation
+
 ### Markers
-- Click with the Marker tool to place named locations
-- Each marker stores name, description, lat/lon, and a 3D position on the globe
-- Marker list in sidebar with coordinates
+- Click with the Marker tool to place named locations on the globe or flat map
+- Each marker stores name, description, and lat/lon coordinates
+- Markers survive upscaling, flipping, and prime meridian shifts
+- Marker list in the sidebar shows coordinates; click to focus
 
 ### Orbit Designer
 - **Planet mode** — define orbit around a star (distance, period, eccentricity, axial tilt)
@@ -80,18 +89,27 @@ mapmaker/
 ## Technical Notes
 
 ### Terrain & Heightmap
-- 512×512 `Float32Array` heightmap stored in `terrain.heightmap`
-- Values 0–1 map to terrain types via thresholds in `TERRAIN` constant
-- Equirectangular projection: `heightmap[y * S + x]` → `lon = (x/S)*360-180`, `lat = 90 - (y/S)*180`
-- Vertex displacement on `SphereGeometry(1, 256, 256)` using `DISPLACE_SCALE = 0.15`
+- Configurable resolution: `Float32Array` of `size × size` values, default 512×512
+- Values 0–1 map to terrain types via ordered thresholds in the `TERRAIN` constant
+- Equirectangular projection: `heightmap[y * S + x]` → `lon = (x/S)*360−180`, `lat = 90 − (y/S)*180`
+- Vertex displacement on `SphereGeometry(1, 256, 256)`, max scale `DISPLACE_SCALE_MAX = 0.15`, modulated by the Terrain Relief slider (default 10%)
+- Upscaling uses bilinear interpolation; the same algorithm handles downscaling
 
 ### Coordinate System
-Three.js uses Y-up coordinates. Lat/lon ↔ 3D position:
+Three.js Y-up. The UV mapping that keeps the globe and flat map consistent:
+
 ```
-x = cos(lat) * cos(lon)
-y = sin(lat)
-z = cos(lat) * sin(lon)
+u = 0.5 − atan2(nz, nx) / (2π)   → px = u * S  (west=0, east=S)
+v = 0.5 − asin(ny) / π            → py = v * S  (north=0, south=S)
 ```
+
+Lat/lon from a raycasted 3D point:
+```
+lat =  asin(ny) × (180/π)
+lon = −atan2(nz, nx) × (180/π)
+```
+
+Longitude is negated relative to the raw `atan2` result so that rotating the globe rightward corresponds to increasing longitude — consistent with the flat map's left-to-right west→east axis.
 
 ### Orbital Mechanics
 Keplerian ellipse: semi-major axis `a`, eccentricity `e`, semi-minor `b = a * sqrt(1-e²)`.
@@ -153,5 +171,5 @@ aws cloudformation deploy \
 This syncs static files to S3 (with correct cache headers) and creates a CloudFront invalidation.
 
 ### Cache headers
-- `index.html` — `no-cache` (always fresh)
-- All other assets — `max-age=31536000, immutable` (fingerprint via content hash not currently used — bump deploy when JS changes)
+- `index.html` — `max-age=3600` (1 hour); CloudFront invalidation on every deploy ensures the CDN always serves the latest version immediately after release
+- All other assets — `max-age=31536000, immutable`; a Unix timestamp is injected into every JS import URL at deploy time (`?v=<ts>`), so browsers always fetch fresh files after a deploy and then cache them for a year

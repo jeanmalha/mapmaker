@@ -33,6 +33,7 @@
         <button class="tool-btn" data-tool="lower" title="Lower terrain">&#9660;</button>
         <button class="tool-btn" data-tool="smooth" title="Smooth">&#9675;</button>
         <button class="tool-btn" data-tool="marker" title="Place marker">&#9873;</button>
+        <button class="tool-btn" data-tool="setlon" title="Set as longitude 0°">0°</button>
       </div>
     </section>
 
@@ -65,6 +66,14 @@
 
     <section class="panel" id="panel-generate">
       <h2 class="panel-title">Generate</h2>
+      <label class="field-label">Resolution
+        <select id="gen-resolution">
+          <option value="256">256 × 256 — Draft</option>
+          <option value="512" selected>512 × 512 — Standard</option>
+          <option value="1024">1024 × 1024 — High</option>
+          <option value="2048">2048 × 2048 — Ultra</option>
+        </select>
+      </label>
       <label class="slider-label">Sea Level
         <input type="range" id="gen-sea-level" min="0" max="100" value="42" />
         <span id="gen-sea-level-val">42</span>
@@ -86,6 +95,7 @@
         <span id="gen-roughness-val">40</span>
       </label>
       <button class="btn-primary" id="btn-generate">Generate Planet</button>
+      <button class="btn-secondary" id="btn-upscale">Upscale (keep terrain)</button>
       <button class="btn-secondary" id="btn-flip-ew">Flip E ↔ W</button>
     </section>
   </aside>
@@ -224,8 +234,8 @@
     <section class="panel" id="panel-sun">
       <h2 class="panel-title">Sun &amp; View</h2>
       <label class="slider-label">Terrain Relief
-        <input type="range" id="terrain-relief" min="0" max="100" value="100" />
-        <span id="terrain-relief-val">100%</span>
+        <input type="range" id="terrain-relief" min="0" max="100" value="10" />
+        <span id="terrain-relief-val">10%</span>
       </label>
       <label class="slider-label">Time of Day
         <input type="range" id="sun-angle" min="0" max="359" value="45" />

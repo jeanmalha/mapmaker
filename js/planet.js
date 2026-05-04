@@ -13,7 +13,7 @@ export class Planet {
   constructor(canvas, terrain) {
     this.canvas  = canvas;
     this.terrain = terrain;
-    this.reliefScale = 1.0; // 0 = flat sphere, 1 = full displacement
+    this.reliefScale = 0.1; // 0 = flat sphere, 1 = full displacement
     this._setupScene();
     this._setupGlobe();
     this._setupAtmosphere();

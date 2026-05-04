@@ -38,18 +38,31 @@ export class Markers {
     this._items.splice(idx, 1);
   }
 
+  /** Rotate all markers so that `degrees` longitude becomes the new 0° */
+  shiftLon(degrees) {
+    for (const m of this._items) {
+      let lon = m.lon - degrees;
+      lon = ((lon + 180) % 360 + 360) % 360 - 180;
+      m.lon = lon;
+      this._repositionMesh(m);
+    }
+  }
+
+  _repositionMesh(m) {
+    const latRad = m.lat * Math.PI / 180;
+    const lonRad = m.lon * Math.PI / 180;
+    m.mesh.position.set(
+      Math.cos(latRad) * Math.cos(lonRad),
+      Math.sin(latRad),
+      -Math.cos(latRad) * Math.sin(lonRad),
+    ).normalize().multiplyScalar(1.02);
+  }
+
   /** Mirror all markers east↔west (negate longitude, reposition meshes) */
   flipEW() {
     for (const m of this._items) {
       m.lon = -m.lon;
-      const latRad = m.lat * Math.PI / 180;
-      const lonRad = m.lon * Math.PI / 180;
-      const pos = new THREE.Vector3(
-        Math.cos(latRad) * Math.cos(lonRad),
-        Math.sin(latRad),
-        -Math.cos(latRad) * Math.sin(lonRad),
-      ).normalize().multiplyScalar(1.02);
-      m.mesh.position.copy(pos);
+      this._repositionMesh(m);
     }
   }
 

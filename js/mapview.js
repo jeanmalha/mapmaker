@@ -36,8 +36,6 @@ export class MapView {
     this._buffer = document.createElement('canvas');
     this._buffer.width  = terrain.size;
     this._buffer.height = terrain.size;
-
-    // Persistent ImageData — reused to avoid 1 MB allocation on every brush stroke
     this._imageData = null;
 
     this._bindEvents();
@@ -46,6 +44,13 @@ export class MapView {
   /** Pass the markers list from markers.js so the flat map can render them */
   setMarkers(markersInstance) {
     this._markersRef = markersInstance;
+  }
+
+  /** Resize the offscreen buffer to match terrain.size after a resolution change */
+  resizeBuffer() {
+    this._buffer.width  = this.terrain.size;
+    this._buffer.height = this.terrain.size;
+    this._imageData = null;
   }
 
   // ── Render heightmap → offscreen buffer ──────────
