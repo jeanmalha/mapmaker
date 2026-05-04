@@ -8,7 +8,6 @@
 set -euo pipefail
 
 # ── Load personal config ──────────────────────────────
-# Copy infra/deploy.env.example → infra/deploy.env and fill in your values.
 ENV_FILE="$(dirname "$0")/deploy.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Error: $ENV_FILE not found. Copy deploy.env.example and fill in your values."
@@ -75,28 +74,66 @@ echo "  Bucket:       $BUCKET"
 echo "  Distribution: $DIST_ID"
 echo "  CF Domain:    https://$CF_DOMAIN"
 
-# ── 3. Sync all files with no-cache ──────────────────
-# All assets use no-cache so browsers always revalidate with CloudFront.
-# CloudFront serves 304 Not Modified for unchanged files (fast, no S3 cost).
-# This avoids stale-module issues from browsers caching ES module imports
-# with immutable — there's no build step to fingerprint individual filenames.
-info "Syncing app files to s3://$BUCKET …"
+# ── 3. Build versioned JS/CSS into a temp directory ──
+#
+# Caching strategy:
+#   - JS/CSS: max-age=1year + immutable (aggressive browser + CDN caching)
+#   - index.html: no-cache (always fresh)
+#
+# Cache-busting: a Unix timestamp is injected as ?v=<ts> into every
+# ES module import statement in every JS file, and into the <script>/<link>
+# tags in index.html. Since all URLs change on each deploy, browsers treat
+# them as new resources and fetch fresh — then cache for a year.
+#
+DEPLOY_VERSION=$(date +%s)
+TMPDIR=$(mktemp -d /tmp/mapmaker-deploy.XXXXXX)
+mkdir -p "$TMPDIR/js"
 
-aws s3 sync "$APP_DIR" "s3://$BUCKET" \
+info "Stamping version $DEPLOY_VERSION into JS imports…"
+
+for src in "$APP_DIR"/js/*.js; do
+  fname=$(basename "$src")
+  # Rewrite:  from './foo.js'   →   from './foo.js?v=<ts>'
+  sed "s/from '\(\.\/[^']*\.js\)'/from '\1?v=${DEPLOY_VERSION}'/g" \
+    "$src" > "$TMPDIR/js/$fname"
+done
+
+# CSS (no imports to rewrite, just copy)
+cp "$APP_DIR/style.css" "$TMPDIR/style.css"
+
+# index.html: stamp the <script src> and <link href> entry points
+sed \
+  -e "s|src=\"js/\([^\"]*\)\.js\"|src=\"js/\1.js?v=${DEPLOY_VERSION}\"|g" \
+  -e "s|href=\"\([^\"]*\)\.css\"|href=\"\1.css?v=${DEPLOY_VERSION}\"|g" \
+  "$APP_DIR/index.html" > "$TMPDIR/index.html"
+
+success "Version stamping done."
+
+# ── 4. Upload to S3 ───────────────────────────────────
+info "Uploading to s3://$BUCKET …"
+
+# JS files — immutable, cached forever (URL changes each deploy)
+aws s3 sync "$TMPDIR/js" "s3://$BUCKET/js" \
   --profile "$PROFILE" \
-  --exclude ".git/*" \
-  --exclude ".claude/*" \
-  --exclude "infra/*" \
-  --exclude ".DS_Store" \
-  --exclude "*.sh" \
-  --exclude "*.md" \
-  --exclude "node_modules/*" \
   --delete \
-  --cache-control "no-cache, no-store, must-revalidate"
+  --cache-control "public, max-age=31536000, immutable"
 
-success "Files synced."
+# CSS — immutable
+aws s3 cp "$TMPDIR/style.css" "s3://$BUCKET/style.css" \
+  --profile "$PROFILE" \
+  --cache-control "public, max-age=31536000, immutable" \
+  --content-type "text/css"
 
-# ── 4. Invalidate CloudFront cache ────────────────────
+# index.html — no-cache (always revalidate)
+aws s3 cp "$TMPDIR/index.html" "s3://$BUCKET/index.html" \
+  --profile "$PROFILE" \
+  --cache-control "no-cache, no-store, must-revalidate" \
+  --content-type "text/html"
+
+rm -rf "$TMPDIR"
+success "Files uploaded."
+
+# ── 5. Invalidate CloudFront cache ────────────────────
 info "Invalidating CloudFront cache…"
 
 INVALIDATION_ID=$(aws cloudfront create-invalidation \
@@ -108,8 +145,8 @@ INVALIDATION_ID=$(aws cloudfront create-invalidation \
 
 success "Invalidation created: $INVALIDATION_ID"
 
-# ── 5. Done ───────────────────────────────────────────
+# ── 6. Done ───────────────────────────────────────────
 echo ""
-success "Deployment complete!"
-echo -e "  ${GREEN}https://${DOMAIN}${NC}  (DNS may take a few minutes)"
-echo -e "  ${CYAN}https://$CF_DOMAIN${NC}  (CloudFront domain, works immediately)"
+success "Deployment complete! (version: $DEPLOY_VERSION)"
+echo -e "  ${GREEN}https://${DOMAIN}${NC}"
+echo -e "  ${CYAN}https://$CF_DOMAIN${NC}  (CloudFront domain)"
