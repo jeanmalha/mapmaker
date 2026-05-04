@@ -129,6 +129,15 @@ export class UI {
         this.mapView.render();
       }
     });
+
+    document.getElementById('btn-flip-ew').addEventListener('click', () => {
+      this.terrain.flipEW();
+      this.markers.flipEW();
+      this.planet.updateGeometry(this.terrain.heightmap);
+      this.mapView.renderBuffer();
+      this.mapView.render();
+      this._refreshMarkerList();
+    });
   }
 
   // ── Planet info ───────────────────────────────────

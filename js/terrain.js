@@ -181,6 +181,19 @@ export class Terrain {
     }
   }
 
+  /** Mirror the heightmap left↔right (east↔west) */
+  flipEW() {
+    const S  = this.size;
+    const hm = this.heightmap;
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S >> 1; x++) {
+        const a = y * S + x;
+        const b = y * S + (S - 1 - x);
+        const tmp = hm[a]; hm[a] = hm[b]; hm[b] = tmp;
+      }
+    }
+  }
+
   /** Minimal 3D simplex noise factory (no external dep needed) */
   _makeNoise() {
     // Permutation table

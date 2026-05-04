@@ -37,6 +37,9 @@ export class MapView {
     this._buffer.width  = terrain.size;
     this._buffer.height = terrain.size;
 
+    // Persistent ImageData — reused to avoid 1 MB allocation on every brush stroke
+    this._imageData = null;
+
     this._bindEvents();
   }
 

@@ -267,9 +267,9 @@ export class Planet {
       const ny   = by / len;
       const nz   = bz / len;
 
-      // UV from sphere normal
-      const u  = (Math.atan2(nz, nx) / (Math.PI * 2) + 0.5);
-      const v  = (Math.asin(Math.max(-1, Math.min(1, ny))) / Math.PI + 0.5);
+      // UV from sphere normal — u increases east, v=0 at north pole
+      const u  = 0.5 - Math.atan2(nz, nx) / (Math.PI * 2);
+      const v  = 0.5 - Math.asin(Math.max(-1, Math.min(1, ny))) / Math.PI;
       const px = Math.floor(u * S) % S;
       const py = Math.floor(v * S) % S;
       const h  = heightmap[py * S + px];
@@ -298,9 +298,9 @@ export class Planet {
 
     const pt = hits[0].point.normalize();
     const lat = Math.asin(pt.y) * (180 / Math.PI);
-    const lon = Math.atan2(pt.z, pt.x) * (180 / Math.PI);
-    const u   = (Math.atan2(pt.z, pt.x) / (Math.PI * 2) + 0.5);
-    const v   = (Math.asin(Math.max(-1, Math.min(1, pt.y))) / Math.PI + 0.5);
+    const lon = -Math.atan2(pt.z, pt.x) * (180 / Math.PI);
+    const u   = 0.5 - Math.atan2(pt.z, pt.x) / (Math.PI * 2);
+    const v   = 0.5 - Math.asin(Math.max(-1, Math.min(1, pt.y))) / Math.PI;
     const px  = Math.floor(u * this.terrain.size) % this.terrain.size;
     const py  = Math.floor(v * this.terrain.size) % this.terrain.size;
 

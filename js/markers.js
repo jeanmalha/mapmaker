@@ -38,6 +38,21 @@ export class Markers {
     this._items.splice(idx, 1);
   }
 
+  /** Mirror all markers east↔west (negate longitude, reposition meshes) */
+  flipEW() {
+    for (const m of this._items) {
+      m.lon = -m.lon;
+      const latRad = m.lat * Math.PI / 180;
+      const lonRad = m.lon * Math.PI / 180;
+      const pos = new THREE.Vector3(
+        Math.cos(latRad) * Math.cos(lonRad),
+        Math.sin(latRad),
+        -Math.cos(latRad) * Math.sin(lonRad),
+      ).normalize().multiplyScalar(1.02);
+      m.mesh.position.copy(pos);
+    }
+  }
+
   /** Show or hide all marker pins on the 3D globe */
   setVisible(visible) {
     for (const m of this._items) m.mesh.visible = visible;
@@ -59,8 +74,7 @@ export class Markers {
     this._items = [];
 
     for (const item of list) {
-      // Y-up spherical coordinates matching planet.js raycast convention:
-      //   lat → asin(y),  lon → atan2(z, x)
+      // Y-up spherical — matches planet.js raycast: lat→asin(y), lon→-atan2(z,x)
       const latRad = item.lat * Math.PI / 180;
       const lonRad = item.lon * Math.PI / 180;
       const fakeHit = {
@@ -68,7 +82,7 @@ export class Markers {
         point: new THREE.Vector3(
           Math.cos(latRad) * Math.cos(lonRad),
           Math.sin(latRad),
-          Math.cos(latRad) * Math.sin(lonRad),
+          -Math.cos(latRad) * Math.sin(lonRad),
         ),
       };
       const m = this.add(fakeHit, item.name, item.description);

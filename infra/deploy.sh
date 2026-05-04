@@ -34,7 +34,7 @@ ACTION="${1:-deploy}"
 
 # ── 1. Deploy / update CloudFormation stack ──────────
 if [[ "$ACTION" != "sync" ]]; then
-  info "Deploying CloudFormation stack '$STACK_NAME' to $REGION…"
+  info "Deploying CloudFormation stack '$STACK_NAME' to ${REGION}..."
   aws cloudformation deploy \
     --profile "$PROFILE" \
     --region  "$REGION" \
