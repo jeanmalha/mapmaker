@@ -62,9 +62,10 @@ export class UI {
     orbitalCanvas.style.display = view === 'orbital' ? 'block' : 'none';
 
     if (view === 'flat') {
-      mapCanvas.width  = mapCanvas.clientWidth;
-      mapCanvas.height = mapCanvas.clientHeight;
-      this.mapView.fitToCanvas();
+      const dpr = window.devicePixelRatio || 1;
+      mapCanvas.width  = mapCanvas.clientWidth  * dpr;
+      mapCanvas.height = mapCanvas.clientHeight * dpr;
+      this.mapView.fitToCanvas(dpr);
       this.mapView.renderBuffer();
       this.mapView.render();
     }
@@ -119,6 +120,7 @@ export class UI {
     this._slider('gen-roughness',  v => { this.state.planet.settings.roughness      = v / 100; });
 
     document.getElementById('btn-generate').addEventListener('click', () => {
+      if (!confirm('Generate a new planet? This will replace all current terrain.')) return;
       this.terrain.generate(this.state.planet.settings);
       this.planet.updateGeometry(this.terrain.heightmap);
       // Re-render flat map buffer if it's visible

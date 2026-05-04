@@ -157,6 +157,13 @@ export class Storage {
     const binary = atob(b64);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    if (bytes.byteLength % 4 !== 0) {
+      throw new Error(`Heightmap data is corrupt (byte length ${bytes.byteLength} is not a multiple of 4)`);
+    }
+    const expected = this.terrain.size * this.terrain.size * 4; // Float32 = 4 bytes
+    if (bytes.byteLength !== expected) {
+      throw new Error(`Heightmap size mismatch: expected ${expected} bytes for ${this.terrain.size}² map, got ${bytes.byteLength}`);
+    }
     return new Float32Array(bytes.buffer);
   }
 
