@@ -16,10 +16,7 @@ export class MapView {
     this.ctx     = canvas.getContext('2d');
     this.terrain = terrain;
 
-    // Device pixel ratio — updated whenever the canvas is resized
-    this._dpr = 1;
-
-    // Viewport transform (pan + zoom) — always in CSS pixels
+    // Viewport transform (pan + zoom)
     this._scale  = 1;
     this._offsetX = 0;
     this._offsetY = 0;
@@ -62,19 +59,10 @@ export class MapView {
     ctx.putImageData(img, 0, 0);
   }
 
-  // CSS-pixel dimensions (independent of device pixel ratio)
-  get _cssWidth()  { return this.canvas.width  / this._dpr; }
-  get _cssHeight() { return this.canvas.height / this._dpr; }
-
   // ── Draw to screen canvas ─────────────────────────
   render() {
-    const W   = this._cssWidth;
-    const H   = this._cssHeight;
+    const { width: W, height: H } = this.canvas;
     const ctx = this.ctx;
-
-    // Scale once for HiDPI — all draw calls below use CSS pixels
-    ctx.save();
-    ctx.scale(this._dpr, this._dpr);
 
     // Background
     ctx.fillStyle = '#0a0a0f';
@@ -91,8 +79,6 @@ export class MapView {
     if (this.showMarkers && this._markersRef) {
       this._drawMarkers(W, H);
     }
-
-    ctx.restore(); // remove DPR scale
   }
 
   // Convert a lat/lon to screen pixel, accounting for pan + zoom
@@ -183,8 +169,7 @@ export class MapView {
   }
 
   // ── Fit view to canvas ────────────────────────────
-  fitToCanvas(dpr) {
-    if (dpr !== undefined) this._dpr = dpr;
+  fitToCanvas() {
     this._scale   = 1;
     this._offsetX = 0;
     this._offsetY = 0;
@@ -197,8 +182,8 @@ export class MapView {
     const sx   = (clientX - rect.left  - this._offsetX) / this._scale;
     const sy   = (clientY - rect.top   - this._offsetY) / this._scale;
     const S    = this.terrain.size;
-    const W    = this._cssWidth;
-    const H    = this._cssHeight;
+    const W    = this.canvas.width;
+    const H    = this.canvas.height;
     const px   = Math.floor((sx / W) * S);
     const py   = Math.floor((sy / H) * S);
     return { px: Math.max(0, Math.min(S-1, px)), py: Math.max(0, Math.min(S-1, py)) };
@@ -209,8 +194,8 @@ export class MapView {
     const rect = this.canvas.getBoundingClientRect();
     const sx   = (clientX - rect.left  - this._offsetX) / this._scale;
     const sy   = (clientY - rect.top   - this._offsetY) / this._scale;
-    const W    = this._cssWidth;
-    const H    = this._cssHeight;
+    const W    = this.canvas.width;
+    const H    = this.canvas.height;
     const lon  = (sx / W) * 360 - 180;
     const lat  = 90 - (sy / H) * 180;
     return { lat, lon };
