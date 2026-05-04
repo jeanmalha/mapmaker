@@ -75,14 +75,12 @@ echo "  Bucket:       $BUCKET"
 echo "  Distribution: $DIST_ID"
 echo "  CF Domain:    https://$CF_DOMAIN"
 
-# ── 3. Sync JS/CSS/assets with long-lived cache ───────
-# Strategy: JS/CSS get max-age=1year + immutable so CloudFront and browsers
-# cache them aggressively. index.html gets no-cache and embeds a deploy
-# timestamp as a query string on every asset URL — so browsers always fetch
-# the latest index.html, see new ?v= URLs, and re-fetch any changed assets.
+# ── 3. Sync all files with no-cache ──────────────────
+# All assets use no-cache so browsers always revalidate with CloudFront.
+# CloudFront serves 304 Not Modified for unchanged files (fast, no S3 cost).
+# This avoids stale-module issues from browsers caching ES module imports
+# with immutable — there's no build step to fingerprint individual filenames.
 info "Syncing app files to s3://$BUCKET …"
-
-DEPLOY_VERSION=$(date +%s)   # Unix timestamp used as cache-buster in index.html
 
 aws s3 sync "$APP_DIR" "s3://$BUCKET" \
   --profile "$PROFILE" \
@@ -93,24 +91,10 @@ aws s3 sync "$APP_DIR" "s3://$BUCKET" \
   --exclude "*.sh" \
   --exclude "*.md" \
   --exclude "node_modules/*" \
-  --exclude "index.html" \
   --delete \
-  --cache-control "public, max-age=31536000, immutable"
+  --cache-control "no-cache, no-store, must-revalidate"
 
-# index.html: stamp every js/css reference with ?v=<timestamp> so that
-# after a deploy, browsers fetch the updated files even if filenames are identical.
-TMPFILE=$(mktemp /tmp/index.XXXXXX.html)
-sed "s/\.js\"/\.js?v=${DEPLOY_VERSION}\"/g; s/\.css\"/\.css?v=${DEPLOY_VERSION}\"/g" \
-  "$APP_DIR/index.html" > "$TMPFILE"
-
-aws s3 cp "$TMPFILE" "s3://$BUCKET/index.html" \
-  --profile "$PROFILE" \
-  --cache-control "no-cache, no-store, must-revalidate" \
-  --content-type "text/html"
-
-rm "$TMPFILE"
-
-success "Files synced (deploy version: $DEPLOY_VERSION)."
+success "Files synced."
 
 # ── 4. Invalidate CloudFront cache ────────────────────
 info "Invalidating CloudFront cache…"
