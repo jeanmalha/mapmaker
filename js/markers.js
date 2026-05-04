@@ -38,6 +38,11 @@ export class Markers {
     this._items.splice(idx, 1);
   }
 
+  /** Show or hide all marker pins on the 3D globe */
+  setVisible(visible) {
+    for (const m of this._items) m.mesh.visible = visible;
+  }
+
   getAll() { return this._items; }
 
   /** Serialise for JSON export */

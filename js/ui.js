@@ -289,9 +289,8 @@ export class UI {
   }
 
   _refreshMarkerList() {
-    // Keep flat map in sync
+    // Keep flat map in sync (terrain buffer unchanged, just re-composite markers)
     if (this._currentView === 'flat') {
-      this.mapView.renderBuffer();
       this.mapView.render();
     }
 
@@ -699,20 +698,18 @@ export class UI {
       this.planet.setPoleMarkersVisible(e.target.checked);
     });
 
-    const rerenderFlat = () => {
-      if (this._currentView === 'flat') {
-        this.mapView.renderBuffer();
-        this.mapView.render();
-      }
-    };
-
     document.getElementById('toggle-markers').addEventListener('change', e => {
-      this.mapView.showMarkers = e.target.checked;
-      rerenderFlat();
+      const visible = e.target.checked;
+      // 3D globe: toggle pin mesh visibility
+      this.markers.setVisible(visible);
+      // Flat map: toggle marker overlay
+      this.mapView.showMarkers = visible;
+      if (this._currentView === 'flat') this.mapView.render();
     });
+
     document.getElementById('toggle-marker-labels').addEventListener('change', e => {
       this.mapView.showLabels = e.target.checked;
-      rerenderFlat();
+      if (this._currentView === 'flat') this.mapView.render();
     });
   }
 
