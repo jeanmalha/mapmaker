@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/
+
+# Personal deployment config (AWS profile, domain, distribution ID)
+infra/deploy.env
+
+# Node (if ever added)
+node_modules/

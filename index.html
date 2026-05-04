@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mapmaker</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Three.js -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ── Left Sidebar: Tools ─────────────────────────── -->
+  <aside id="sidebar-left" class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo">MAPMAKER</span>
+    </div>
+
+    <section class="panel" id="panel-tools">
+      <h2 class="panel-title">Tools</h2>
+      <div class="tool-grid">
+        <button class="tool-btn active" data-tool="orbit" title="Orbit">&#9654;</button>
+        <button class="tool-btn" data-tool="paint" title="Paint terrain">&#9998;</button>
+        <button class="tool-btn" data-tool="raise" title="Raise terrain">&#9650;</button>
+        <button class="tool-btn" data-tool="lower" title="Lower terrain">&#9660;</button>
+        <button class="tool-btn" data-tool="smooth" title="Smooth">&#9675;</button>
+        <button class="tool-btn" data-tool="marker" title="Place marker">&#9873;</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-terrain">
+      <h2 class="panel-title">Terrain Type</h2>
+      <div class="terrain-types">
+        <button class="terrain-btn active" data-terrain="ocean">Deep Ocean</button>
+        <button class="terrain-btn" data-terrain="coast">Coast</button>
+        <button class="terrain-btn" data-terrain="beach">Beach</button>
+        <button class="terrain-btn" data-terrain="desert_yellow">Desert (Yellow)</button>
+        <button class="terrain-btn" data-terrain="desert_white">Desert (White)</button>
+        <button class="terrain-btn" data-terrain="plains">Plains</button>
+        <button class="terrain-btn" data-terrain="hills">Hills</button>
+        <button class="terrain-btn" data-terrain="mountains">Mountains</button>
+        <button class="terrain-btn" data-terrain="peaks">Peaks</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-brush">
+      <h2 class="panel-title">Brush</h2>
+      <label class="slider-label">Size
+        <input type="range" id="brush-size" min="1" max="50" value="10" />
+        <span id="brush-size-val">10</span>
+      </label>
+      <label class="slider-label">Strength
+        <input type="range" id="brush-strength" min="1" max="100" value="50" />
+        <span id="brush-strength-val">50</span>
+      </label>
+    </section>
+
+    <section class="panel" id="panel-generate">
+      <h2 class="panel-title">Generate</h2>
+      <label class="slider-label">Sea Level
+        <input type="range" id="gen-sea-level" min="0" max="100" value="42" />
+        <span id="gen-sea-level-val">42</span>
+      </label>
+      <label class="slider-label land-shape-label">
+        <span class="land-shape-ends"><span>Islands</span><span>Continents</span></span>
+        <input type="range" id="gen-land-shape" min="0" max="100" value="50" />
+      </label>
+      <label class="slider-label">Continent Size
+        <input type="range" id="gen-continent" min="0" max="100" value="50" />
+        <span id="gen-continent-val">50</span>
+      </label>
+      <label class="slider-label">Mountain Height
+        <input type="range" id="gen-mountains" min="0" max="100" value="60" />
+        <span id="gen-mountains-val">60</span>
+      </label>
+      <label class="slider-label">Roughness
+        <input type="range" id="gen-roughness" min="0" max="100" value="40" />
+        <span id="gen-roughness-val">40</span>
+      </label>
+      <button class="btn-primary" id="btn-generate">Generate Planet</button>
+    </section>
+  </aside>
+
+  <!-- ── Viewport ────────────────────────────────────── -->
+  <main id="viewport">
+    <!-- View toggle -->
+    <div id="view-toggle">
+      <button class="view-btn active" data-view="globe" title="3D Globe">&#9679; Globe</button>
+      <button class="view-btn" data-view="flat" title="Flat Map">&#9645; Flat Map</button>
+      <button class="view-btn" data-view="orbital" title="Orbital View">&#11088; Orbital</button>
+    </div>
+
+    <canvas id="planet-canvas"></canvas>
+    <canvas id="map-canvas" style="display:none"></canvas>
+    <canvas id="orbital-canvas" style="display:none"></canvas>
+  </main>
+
+  <!-- ── Right Sidebar: Planet Info ─────────────────── -->
+  <aside id="sidebar-right" class="sidebar">
+    <section class="panel" id="panel-planet-info">
+      <h2 class="panel-title">Planet</h2>
+      <label class="field-label">Name
+        <input type="text" id="planet-name" placeholder="Unnamed World" />
+      </label>
+      <label class="field-label">Radius (km)
+        <input type="number" id="planet-radius" value="6400" min="100" />
+      </label>
+      <label class="field-label">Notes
+        <textarea id="planet-notes" rows="5" placeholder="Notes for your novel..."></textarea>
+      </label>
+    </section>
+
+    <section class="panel" id="panel-orbit">
+      <h2 class="panel-title collapsible-title" data-target="orbit-body">&#9654; Orbit &amp; Star System</h2>
+      <div id="orbit-body" class="collapsible-body" style="display:none">
+
+        <!-- Mode toggle -->
+        <div class="orbit-mode-row">
+          <button class="orbit-mode-btn active" data-mode="planet">Planet</button>
+          <button class="orbit-mode-btn" data-mode="moon">Moon / Satellite</button>
+        </div>
+
+        <!-- Star -->
+        <div class="orbit-group">
+          <div class="orbit-group-title">&#9733; Star</div>
+          <label class="field-label">Name
+            <input type="text" id="orbit-star-name" value="The Star" />
+          </label>
+          <label class="field-label">Spectral Type
+            <select id="orbit-star-type"></select>
+          </label>
+          <div class="orbit-stats" id="star-stats"></div>
+          <label class="field-label">Age (billion years)
+            <input type="number" id="orbit-star-age" value="4.6" min="0.1" max="13" step="0.1" />
+          </label>
+        </div>
+
+        <!-- Planet orbit (shown when mode = planet) -->
+        <div class="orbit-group" id="orbit-planet-group">
+          <div class="orbit-group-title">&#9691; Orbit around Star</div>
+          <label class="field-label">Distance (AU)
+            <input type="number" id="orbit-au" value="1.0" min="0.01" max="50" step="0.01" />
+          </label>
+          <label class="field-label">Period (days)
+            <input type="number" id="orbit-period" value="365" min="1" step="1" />
+          </label>
+          <label class="field-label">Eccentricity (0–0.99)
+            <input type="number" id="orbit-eccentricity" value="0.017" min="0" max="0.99" step="0.001" />
+          </label>
+          <label class="field-label">Axial Tilt (°)
+            <input type="number" id="orbit-axial-tilt" value="23.5" min="0" max="90" step="0.5" />
+          </label>
+        </div>
+
+        <!-- Gas giant (shown when mode = moon) -->
+        <div class="orbit-group" id="orbit-giant-group" style="display:none">
+          <div class="orbit-group-title">&#9678; Gas Giant</div>
+          <label class="field-label">Name
+            <input type="text" id="orbit-giant-name" value="The Giant" />
+          </label>
+          <label class="field-label">Type
+            <select id="orbit-giant-type"></select>
+          </label>
+          <label class="field-label">Mass (Jupiter masses)
+            <input type="number" id="orbit-giant-mass" value="1.0" min="0.1" max="80" step="0.1" />
+          </label>
+          <label class="field-label">Radius (Jupiter radii)
+            <input type="number" id="orbit-giant-radius" value="1.0" min="0.1" max="2" step="0.05" />
+          </label>
+          <label class="field-label">Distance from Star (AU)
+            <input type="number" id="orbit-giant-au" value="5.2" min="0.1" max="100" step="0.1" />
+          </label>
+          <label class="field-label">Giant's Year (days)
+            <input type="number" id="orbit-giant-period" value="4333" min="10" step="1" />
+          </label>
+          <label class="toggle-label" style="margin-top:4px">
+            <input type="checkbox" id="orbit-giant-show" checked />
+            <span class="toggle-track"></span>
+            Show in 3D scene
+          </label>
+
+          <div class="orbit-group-title" style="margin-top:8px">&#9691; Moon Orbit</div>
+          <label class="field-label">Semi-major axis (km)
+            <input type="number" id="orbit-moon-sma" value="400000" min="10000" step="1000" />
+          </label>
+          <label class="field-label">Orbital period (days)
+            <input type="number" id="orbit-moon-period" value="15" min="0.1" step="0.1" />
+          </label>
+          <label class="field-label">Eccentricity (0–0.99)
+            <input type="number" id="orbit-moon-ecc" value="0.01" min="0" max="0.99" step="0.001" />
+          </label>
+          <label class="field-label">Inclination (°)
+            <input type="number" id="orbit-moon-inc" value="0" min="0" max="90" step="0.5" />
+          </label>
+          <label class="toggle-label">
+            <input type="checkbox" id="orbit-tidal-lock" checked />
+            <span class="toggle-track"></span>
+            Tidally locked
+          </label>
+        </div>
+
+        <!-- Derived stats -->
+        <div class="orbit-stats orbit-derived" id="orbit-derived"></div>
+
+      </div><!-- /orbit-body -->
+    </section>
+
+    <section class="panel" id="panel-markers">
+      <h2 class="panel-title">Markers</h2>
+      <ul id="marker-list" class="marker-list">
+        <li class="marker-empty">No markers placed yet.</li>
+      </ul>
+    </section>
+
+    <section class="panel" id="panel-sun">
+      <h2 class="panel-title">Sun &amp; View</h2>
+      <label class="slider-label">Time of Day
+        <input type="range" id="sun-angle" min="0" max="359" value="45" />
+        <span id="sun-angle-val" class="sun-time-display">06:00</span>
+      </label>
+      <label class="slider-label">Axial Tilt
+        <input type="range" id="sun-elevation" min="-45" max="45" value="25" />
+        <span id="sun-elevation-val">25°</span>
+      </label>
+      <button class="btn-secondary" id="btn-sun-animate">&#9654; Animate Day</button>
+      <div class="toggle-row">
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-graticule" />
+          <span class="toggle-track"></span>
+          Lat/Lon Grid
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-poles" />
+          <span class="toggle-track"></span>
+          N/S Poles
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-markers" checked />
+          <span class="toggle-track"></span>
+          Markers
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="toggle-marker-labels" checked />
+          <span class="toggle-track"></span>
+          Marker Labels
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-browser-saves">
+      <h2 class="panel-title">Browser Saves</h2>
+      <div class="save-slot-row">
+        <input type="text" id="save-slot-name" placeholder="Save name…" />
+        <button class="btn-primary btn-small" id="btn-browser-save">Save</button>
+      </div>
+      <ul id="browser-save-list" class="marker-list">
+        <li class="marker-empty">No saves yet.</li>
+      </ul>
+    </section>
+
+    <section class="panel" id="panel-io">
+      <h2 class="panel-title">File</h2>
+      <button class="btn-secondary" id="btn-save">Export JSON</button>
+      <button class="btn-secondary" id="btn-load">Import JSON</button>
+      <button class="btn-secondary" id="btn-screenshot">Screenshot PNG</button>
+      <button class="btn-secondary" id="btn-export-flat">Export Flat Map PNG</button>
+      <input type="file" id="file-input" accept=".json" style="display:none" />
+    </section>
+  </aside>
+
+  <!-- ── Status Bar ──────────────────────────────────── -->
+  <footer id="statusbar">
+    <span id="status-coords">Lat: —  Lon: —</span>
+    <span id="status-terrain">—</span>
+    <span id="status-zoom">Zoom: 1.0×</span>
+    <span id="status-mode">Mode: Orbit</span>
+  </footer>
+
+  <!-- ── Marker Dialog ───────────────────────────────── -->
+  <dialog id="marker-dialog">
+    <form method="dialog" id="marker-form">
+      <h3>New Marker</h3>
+      <label>Name <input type="text" id="marker-name-input" required /></label>
+      <label>Description <textarea id="marker-desc-input" rows="3"></textarea></label>
+      <div class="dialog-actions">
+        <button type="submit" class="btn-primary">Place</button>
+        <button type="button" id="marker-cancel" class="btn-secondary">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
