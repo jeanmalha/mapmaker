@@ -46,8 +46,13 @@ export class OrbitalView {
   // ── Main draw ─────────────────────────────────────
 
   _draw() {
-    const { width: W, height: H } = this.canvas;
+    const dpr = this._dpr || 1;
+    const W   = this._cssW || this.canvas.width;
+    const H   = this._cssH || this.canvas.height;
     const ctx = this.ctx;
+
+    ctx.save();
+    ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, W, H);
 
     // Deep space background
@@ -70,6 +75,8 @@ export class OrbitalView {
     }
 
     this._drawHUD(ctx, W, H);
+
+    ctx.restore(); // remove DPR scale
   }
 
   // ── Planet-around-star view ───────────────────────
@@ -426,12 +433,19 @@ export class OrbitalView {
 
   _resize() {
     const el   = this.canvas;
+    const dpr  = window.devicePixelRatio || 1;
     const rect = el.getBoundingClientRect();
-    const w    = Math.floor(rect.width)  || el.parentElement?.clientWidth  || 800;
-    const h    = Math.floor(rect.height) || el.parentElement?.clientHeight || 600;
-    if (el.width !== w || el.height !== h) {
-      el.width  = w;
-      el.height = h;
+    const cssW = Math.floor(rect.width)  || el.parentElement?.clientWidth  || 800;
+    const cssH = Math.floor(rect.height) || el.parentElement?.clientHeight || 600;
+    const physW = Math.round(cssW * dpr);
+    const physH = Math.round(cssH * dpr);
+    if (el.width !== physW || el.height !== physH) {
+      el.width  = physW;
+      el.height = physH;
     }
+    // Store CSS dimensions and DPR for draw calls
+    this._cssW = cssW;
+    this._cssH = cssH;
+    this._dpr  = dpr;
   }
 }
