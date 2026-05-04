@@ -6,13 +6,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { heightToColor } from './terrain.js';
 
-const SPHERE_SEGMENTS = 256;   // base resolution
-const DISPLACE_SCALE  = 0.15;  // max vertex displacement (fraction of radius)
+const SPHERE_SEGMENTS    = 256;   // base resolution
+const DISPLACE_SCALE_MAX = 0.15;  // max vertex displacement at full relief
 
 export class Planet {
   constructor(canvas, terrain) {
     this.canvas  = canvas;
     this.terrain = terrain;
+    this.reliefScale = 1.0; // 0 = flat sphere, 1 = full displacement
     this._setupScene();
     this._setupGlobe();
     this._setupAtmosphere();
@@ -253,7 +254,7 @@ export class Planet {
     // Displacement exaggeration scales with camera zoom
     const dist    = this.camera.position.length();
     const zoomT   = Math.max(0, Math.min(1, (dist - 1.15) / 3));
-    const dispMag  = DISPLACE_SCALE * (0.3 + 0.7 * (1 - zoomT)); // more detail when zoomed in
+    const dispMag  = DISPLACE_SCALE_MAX * this.reliefScale * (0.3 + 0.7 * (1 - zoomT));
 
     for (let i = 0; i < pos.count; i++) {
       const bx = base[i * 3];

@@ -338,6 +338,16 @@ export class UI {
 
   // ── Sun / time of day ─────────────────────────────
   _bindSunControls() {
+    // Terrain relief (displacement exaggeration)
+    const reliefEl  = document.getElementById('terrain-relief');
+    const reliefVal = document.getElementById('terrain-relief-val');
+    reliefEl.addEventListener('input', () => {
+      const v = +reliefEl.value / 100;
+      this.planet.reliefScale = v;
+      reliefVal.textContent = `${reliefEl.value}%`;
+      this.planet.updateGeometry(this.terrain.heightmap);
+    });
+
     const angleEl = document.getElementById('sun-angle');
     const timeEl  = document.getElementById('sun-angle-val');
     const elevEl  = document.getElementById('sun-elevation');
