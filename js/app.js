@@ -1,5 +1,9 @@
 /**
  * app.js — Bootstrap & global state
+ *
+ * Entry point for the mapmaker application. Instantiates all subsystems,
+ * wires them together, then either restores the most recent browser save
+ * or generates a fresh planet if no save exists.
  */
 
 import { Planet }  from './planet.js';
@@ -12,7 +16,15 @@ import { OrbitalView } from './orbitalview.js';
 import { UI }          from './ui.js';
 import { Storage }     from './storage.js';
 
-// ── Global state ────────────────────────────────────
+/**
+ * Shared application state. Mutated in place by UI and subsystems.
+ *
+ * @property {string}  tool         - Active editing tool: 'orbit' | 'paint' | 'raise' | 'lower' | 'smooth' | 'marker' | 'setlon'
+ * @property {string}  terrainType  - Terrain id used by the paint brush (e.g. 'ocean', 'plains')
+ * @property {number}  brushSize    - Brush radius in heightmap pixels
+ * @property {number}  brushStrength - Brush opacity/strength 0–100
+ * @property {object}  planet       - Per-planet metadata and generation settings
+ */
 export const state = {
   tool: 'orbit',        // orbit | paint | raise | lower | smooth | marker
   terrainType: 'ocean', // which terrain type the paint brush uses
